@@ -18,10 +18,13 @@ jobs:
           python-version: '3.9'
 
       - name: Install dependencies
-        # 只需要 requests，不需要 cloudscraper 了
         run: pip install requests
 
       - name: Run Sign Script
         env:
+          # 从 Secrets 读取 Token
           USER_TOKEN: ${{ secrets.USER_TOKEN }}
+          
+          ENABLE_OFFSET: ${{ secrets.ENABLE_OFFSET }}
+          
         run: python sign.py
