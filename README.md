@@ -24,6 +24,7 @@
 由于网站风控严格，我们需要直接使用电脑浏览器上登录后的凭证（Token）。
 
 1.  在电脑浏览器（推荐 Chrome/Edge）打开并登录 [淘气兔官网](https://vip.taoqitu.pro)。
+    * **还没有账号？** [点此注册支持作者 (含邀请)](https://vip.taoqitu.pro/index.html?register=hvDi8r5s) 🚀
 2.  按下 `F12` 打开开发者工具，点击 **网络 (Network)** 标签。
 3.  点击页面上的“签到”按钮（或刷新页面）。
 4.  在网络请求列表中找到 `sign` 或 `getUserInfo` 等请求。
