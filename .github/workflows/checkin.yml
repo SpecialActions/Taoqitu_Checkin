@@ -2,16 +2,12 @@ name: Taoqitu Auto Checkin
 
 on:
   schedule:
-    - cron: '30 0 * * *'  # 每天北京时间 08:30
-  workflow_dispatch:      # 手动触发
+    - cron: '30 0 * * *'
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    permissions:
-      actions: write
-      contents: read
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -26,15 +22,9 @@ jobs:
 
       - name: Run Sign Script
         env:
+          # 从 Secrets 读取 Token
           USER_TOKEN: ${{ secrets.USER_TOKEN }}
+          
           ENABLE_OFFSET: ${{ secrets.ENABLE_OFFSET }}
+          
         run: python sign.py
-
-      # --- 修复：使用 Merkle-GmbH 维护的版本 ---
-      - name: Delete old workflow runs
-        uses: Merkle-GmbH/delete-workflow-runs@v2.0.3
-        with:
-          token: ${{ github.token }}
-          repository: ${{ github.repository }}
-          retain_days: 7
-          keep_minimum_runs: 7
