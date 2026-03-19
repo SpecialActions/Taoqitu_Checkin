@@ -1,0 +1,41 @@
+name: Taoqitu Auto Checkin
+
+on:
+  schedule:
+    - cron: '30 0 * * *'  # 每天北京时间 08:30
+  workflow_dispatch:      # 允许手动点击触发
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4  # 升级到 v4，解决 Node.js 警告
+
+      - name: Set up Python
+        uses: actions/setup-python@v5  # 升级到 v5，解决 Node.js 警告
+        with:
+          python-version: '3.9'
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Run Sign Script
+        env:
+          USERNAME: ${{ secrets.USERNAME }}        # 传入你设置的账号邮箱
+          PASSWORD: ${{ secrets.PASSWORD }}        # 传入你设置的密码
+          ENABLE_OFFSET: ${{ secrets.ENABLE_OFFSET }} 
+        run: python sign.py
+
+      # --- 使用 GitHub 官方命令清理旧日志，永远不会失效 ---
+      - name: Delete old workflow runs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run list --limit 30 --json databaseId,conclusion | \
+          jq -r '.[] | select(.conclusion=="success" or .conclusion=="skipped" or .conclusion=="cancelled") | .databaseId' | \
+          xargs -I {} gh run delete {} || true
