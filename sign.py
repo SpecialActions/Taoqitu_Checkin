@@ -2,7 +2,7 @@ import requests
 import os
 import time
 
-# 1. 从环境变量获取配置 (请在 GitHub Secrets 中配置)
+# 1. 从环境变量获取配置
 USERNAME = os.environ.get('USERNAME')
 PASSWORD = os.environ.get('PASSWORD')
 ENABLE_OFFSET = os.environ.get('ENABLE_OFFSET', 'false')
@@ -10,20 +10,18 @@ ENABLE_OFFSET = os.environ.get('ENABLE_OFFSET', 'false')
 def run_task():
     if not USERNAME or not PASSWORD:
         print("❌ 错误: 未检测到 USERNAME 或 PASSWORD环境变量！")
-        print("💡 请前往 GitHub 仓库 -> Settings -> Secrets and variables -> Actions 中添加。")
         return
 
-    # API 基础配置 (基于最新抓包结果)
     api_host = "api-20260304.apitutu.com"
     api_base = f"https://{api_host}/gateway/tqt/cn"
     origin_site = "https://vip.taoqitu.pro"
     
-    # 完美伪装 Mac Chrome 浏览器请求头
     headers = {
         "Host": api_host,
         "Accept": "*/*",
         "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
-        "Accept-Encoding": "gzip, deflate, br, zstd",
+        # --- 核心修复：去掉了 br 和 zstd，强制服务器返回普通 gzip 或明文 ---
+        "Accept-Encoding": "gzip, deflate", 
         "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36",
         "Content-Type": "application/json",
         "Origin": origin_site,
@@ -51,24 +49,20 @@ def run_task():
             "password": PASSWORD 
         }
 
-        # 发起登录请求
         login_res = session.post(login_url, json=login_payload, headers=headers, timeout=15)
         
-        # --- 强力排错逻辑：无论成败，先看看服务器到底返回了什么 ---
         try:
             login_data = login_res.json()
         except Exception as e:
-            print(f"❌ 解析 JSON 失败！服务器可能拦截了 GitHub 的 IP (例如 Cloudflare 防护盾)。")
+            print(f"❌ 解析 JSON 失败！")
             print(f"📊 HTTP 状态码: {login_res.status_code}")
-            print(f"🔍 服务器实际返回的原始内容如下 (前800字符):\n{login_res.text[:800]}")
+            print(f"🔍 服务器实际返回的原始内容如下:\n{login_res.text[:800]}")
             return
         
-        # 检查 HTTP 状态码
         if login_res.status_code != 200:
             print(f"❌ 登录网络请求失败，状态码: {login_res.status_code}")
             return
 
-        # 智能提取 Token 逻辑 (兼容不同的返回格式)
         dynamic_token = None
         if isinstance(login_data, dict) and login_data.get('data'):
             data_field = login_data['data']
@@ -80,7 +74,6 @@ def run_task():
         if dynamic_token:
             print("✅ 登录成功，已动态获取最新 Token！")
             
-            # 将新 Token 更新到请求头和 Cookie 中，供后续请求使用
             headers['Authorization'] = dynamic_token
             session.cookies.update({
                 'auth_data': dynamic_token,
@@ -95,7 +88,7 @@ def run_task():
         # 步骤二：执行每日签到
         # ==========================================
         print("🚀 开始执行签到任务...")
-        time.sleep(1) # 稍微停顿，模拟人类操作
+        time.sleep(1) 
         
         sign_url = f"{api_base}/user/sign"
         res = session.get(sign_url, headers=headers, timeout=10)
@@ -117,7 +110,7 @@ def run_task():
                 print(f"🛑 抵消功能未开启 (当前设置: {ENABLE_OFFSET})，任务圆满结束。")
                 return
 
-            time.sleep(2) # 抵消前等待，防止请求过快被风控
+            time.sleep(2) 
             print("🔄 抵消开关已开启，正在查询可抵消流量...")
             
             list_res = session.get(f"{api_base}/user/getSignList", headers=headers, timeout=10)
