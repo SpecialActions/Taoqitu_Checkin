@@ -54,20 +54,27 @@ def run_task():
         # 发起登录请求
         login_res = session.post(login_url, json=login_payload, headers=headers, timeout=15)
         
+        # --- 强力排错逻辑：无论成败，先看看服务器到底返回了什么 ---
+        try:
+            login_data = login_res.json()
+        except Exception as e:
+            print(f"❌ 解析 JSON 失败！服务器可能拦截了 GitHub 的 IP (例如 Cloudflare 防护盾)。")
+            print(f"📊 HTTP 状态码: {login_res.status_code}")
+            print(f"🔍 服务器实际返回的原始内容如下 (前800字符):\n{login_res.text[:800]}")
+            return
+        
         # 检查 HTTP 状态码
         if login_res.status_code != 200:
             print(f"❌ 登录网络请求失败，状态码: {login_res.status_code}")
             return
 
-        login_data = login_res.json()
-        
         # 智能提取 Token 逻辑 (兼容不同的返回格式)
         dynamic_token = None
         if isinstance(login_data, dict) and login_data.get('data'):
             data_field = login_data['data']
             if isinstance(data_field, dict):
                 dynamic_token = data_field.get('token') or data_field.get('authorization') or data_field.get('auth_data')
-            elif isinstance(data_field, str): # 有时候 data 直接就是 token 字符串
+            elif isinstance(data_field, str): 
                 dynamic_token = data_field
 
         if dynamic_token:
@@ -81,7 +88,7 @@ def run_task():
             })
         else:
             print(f"❌ 提取 Token 失败！请检查账号密码是否正确。")
-            print(f"🔍 服务器返回的原始内容: {login_res.text[:200]}")
+            print(f"🔍 服务器返回的 JSON 内容: {login_data}")
             return
 
         # ==========================================
@@ -120,11 +127,11 @@ def run_task():
                 if list_data and isinstance(list_data, list):
                     first_item = list_data[0]
                     flow_val = first_item.get('get_num')
-                    is_convert = first_item.get('is_convert') # 获取抵消状态
+                    is_convert = first_item.get('is_convert') 
                     
                     print(f"📊 最新待处理流量: {flow_val}GB (抵消状态: {is_convert})")
                     
-                    if flow_val and is_convert == 0: # 仅当未抵消时执行
+                    if flow_val and is_convert == 0: 
                         convert_res = session.get(f"{api_base}/user/convertSign", headers=headers, params={'convert_num': flow_val})
                         print(f"🎁 抵消结果: {convert_res.json().get('message', '完成')}")
                     else:
