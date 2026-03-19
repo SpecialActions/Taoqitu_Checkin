@@ -16,11 +16,10 @@ def run_task():
     api_base = f"https://{api_host}/gateway/tqt/cn"
     origin_site = "https://vip.taoqitu.pro"
     
-    # 完美伪装的浏览器头
     headers = {
         "Host": api_host,
         "Accept": "*/*",
-        "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+        "Accept-Language": "zh-CN,zh;q=0.9",
         "Accept-Encoding": "gzip, deflate", 
         "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36",
         "Content-Type": "application/json",
@@ -49,7 +48,6 @@ def run_task():
             "password": PASSWORD 
         }
 
-        # 这里带了 headers
         login_res = session.post(login_url, json=login_payload, headers=headers, timeout=15)
         
         if login_res.status_code != 200:
@@ -59,26 +57,36 @@ def run_task():
         login_data = login_res.json()
         dynamic_token = None
         
+        # --- 核心修复：精准定位真正的 JWT Token ---
         if isinstance(login_data, dict) and login_data.get('data'):
             data_field = login_data['data']
             if isinstance(data_field, dict):
-                dynamic_token = data_field.get('token') or data_field.get('authorization') or data_field.get('auth_data')
+                # 遍历可能的字段名，并且只认准以 'ey' 开头的标准 JWT
+                for key in ['authorization', 'auth_data', 'token', 'access_token']:
+                    val = data_field.get(key)
+                    if val and isinstance(val, str) and val.startswith('ey'):
+                        dynamic_token = val
+                        break
+                
+                # 如果没找到 ey 开头的，就硬拿优先级最高的授权字段碰碰运气
+                if not dynamic_token:
+                    dynamic_token = data_field.get('authorization') or data_field.get('auth_data')
             elif isinstance(data_field, str): 
                 dynamic_token = data_field
 
         if dynamic_token:
-            print(f"✅ 登录成功，已动态获取最新 Token！(Token前缀: {dynamic_token[:8]}...)")
+            print(f"✅ 登录成功，已精准获取真正 Token！(Token前缀: {dynamic_token[:15]}...)")
             
-            # 直接更新我们要传的 headers 字典
+            # 直接赋值，不需要补 Bearer
             headers['Authorization'] = dynamic_token
+            headers['authorization'] = dynamic_token # 补充一个小写兼容
             
-            # 同步更新 Cookie
             session.cookies.update({
                 'auth_data': dynamic_token,
                 'authorization': dynamic_token
             })
         else:
-            print(f"❌ 提取 Token 失败！服务器返回: {login_data}")
+            print(f"❌ 提取真正 Token 失败！请看服务器到底返回了什么: {login_data}")
             return
 
         # ==========================================
@@ -88,7 +96,6 @@ def run_task():
         time.sleep(2) 
         
         sign_url = f"{api_base}/user/sign"
-        # 💡 修复：必须要把更新了 Token 之后的 headers 传进来！
         res = session.get(sign_url, headers=headers, timeout=10) 
         
         print(f"📊 签到状态码: {res.status_code}")
@@ -111,7 +118,6 @@ def run_task():
             time.sleep(2) 
             print("🔄 抵消开关已开启，正在查询可抵消流量...")
             
-            # 💡 修复：这里也必须加上 headers
             list_res = session.get(f"{api_base}/user/getSignList", headers=headers, timeout=10)
             
             try:
@@ -124,7 +130,6 @@ def run_task():
                     print(f"📊 最新待处理流量: {flow_val}GB (抵消状态: {is_convert})")
                     
                     if flow_val and is_convert == 0: 
-                        # 💡 修复：这里同样必须加上 headers
                         convert_res = session.get(f"{api_base}/user/convertSign", headers=headers, params={'convert_num': flow_val}, timeout=10)
                         print(f"🎁 抵消结果: {convert_res.json().get('message', '完成')}")
                     else:
