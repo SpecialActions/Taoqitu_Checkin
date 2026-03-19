@@ -1,4 +1,4 @@
-# 🍑 淘气兔全自动签到与抵消脚本 (Taoqitu Auto Checkin)
+# 🐰 淘气兔全自动签到与抵消脚本 (Taoqitu Auto Checkin)
 
 本项目是一个基于 Python 和 GitHub Actions 构建的自动化工具，专门用于「淘气兔 (Taoqitu)」平台的每日自动签到以及流量抵消。
 
