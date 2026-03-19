@@ -1,86 +1,62 @@
-# 🐰 淘气兔自动签到脚本 (Taoqitu Auto Checkin)
+# 🍑 淘气兔全自动签到与抵消脚本 (Taoqitu Auto Checkin)
 
-基于 GitHub Actions 的自动签到脚本，专为 **淘气兔 (Taoqitu)** 网站设计。
+本项目是一个基于 Python 和 GitHub Actions 构建的自动化工具，专门用于「淘气兔 (Taoqitu)」平台的每日自动签到以及流量抵消。
 
-![Python](https://img.shields.io/badge/Python-3.9-blue)
-![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-Automated-green)
-![License](https://img.shields.io/badge/License-MIT-orange)
+得益于**动态账号密码登录**机制，本脚本完美解决了传统固定 Token 容易过期的问题，真正做到了一劳永逸的“无人值守”运行。
 
-## ✨ 功能特性
+---
 
-* **⚡️ 自动化执行**：每天北京时间 **08:30** 自动运行，无需人工干预。
-* **🛡️ 强力防风控**：采用 **桌面端 Token 复用机制** + **Mac Chrome 指纹伪装**，完美绕过 IP 限制和 Cloudflare 验证。
-* **🔧 灵活配置**：支持通过环境变量控制是否自动进行“流量抵消”。
-* **推送通知**：目前脚本只打印日志，可在 Actions 页面查看详细运行结果。
+## ✨ 核心功能
+
+* **🔐 动态鉴权登录**：自动模拟浏览器行为，绕过基础防护，通过账号密码动态获取最新的 JWT Token。
+* **📅 每日自动签到**：依托 GitHub Actions，每天定时（默认北京时间 08:30）自动执行签到，绝不漏签。
+* **🎁 智能流量抵消**：内置开关。开启后，会在签到成功时自动查询并提取未转换的流量记录，执行抵消操作。
+* **🧹 日志自动清理**：每次运行结束后，自动调用 GitHub CLI 清理旧的 Action 运行日志，保持仓库整洁。
 
 ---
 
 ## 🚀 快速开始
 
-### 第一步：Fork 本仓库
-点击右上角的 **Fork** 按钮，将本仓库克隆到你自己的 GitHub 账号下。
+只需简单的几步，即可将本脚本部署到你自己的 GitHub 仓库中长期运行。
 
-### 第二步：获取 USER_TOKEN (核心步骤)
-由于网站风控严格，我们需要直接使用电脑浏览器上登录后的凭证（Token）。
+### 第一步：准备仓库
+1. 点击右上角的 `Fork` 按钮，将本项目复制到你自己的 GitHub 账号下。
+2. 进入你 Fork 后的仓库，点击顶部菜单栏的 **Actions**。
+3. 如果看到一条提示 "I understand my workflows, go ahead and enable them"，请点击确认，启用 Actions 功能。
 
-1.  在电脑浏览器（推荐 Chrome/Edge）打开并登录 [淘气兔官网](https://vip.taoqitu.pro)。
-    * **还没有账号？** [点此注册支持作者 (含邀请)](https://vip.taoqitu.pro/index.html?register=hvDi8r5s) 🚀
-2.  按下 `F12` 打开开发者工具，点击 **网络 (Network)** 标签。
-3.  点击页面上的“签到”按钮（或刷新页面）。
-4.  在网络请求列表中找到 `sign` 或 `getUserInfo` 等请求。
-5.  在右侧 **请求头 (Request Headers)** 中找到 **`Authorization`** 字段。
-6.  复制那一长串字符（通常以 `eyJ...` 开头）。
-    * ⚠️ **注意**：只复制 `eyJ` 开头的那串字符，**不要**包含 `Bearer ` 前缀。
+### 第二步：配置账号密码 (Secrets)
+为了安全起见，绝对不要将账号密码写在代码中。请使用 GitHub Secrets 进行配置：
 
-### 第三步：配置 GitHub Secrets
-1.  进入你 Fork 后的仓库页面。
-2.  点击 **Settings** -> **Secrets and variables** -> **Actions**。
-3.  点击 **New repository secret**，添加以下变量：
+1. 在你的仓库中，依次点击 **Settings** -> **Secrets and variables** -> **Actions**。
+2. 点击绿色的 **New repository secret** 按钮，分别添加以下三个变量：
 
-| Secret Name | 必填 | 说明 |
-| :--- | :---: | :--- |
-| `USER_TOKEN` | ✅ | **核心凭证**。填入上一步获取的 Authorization 字符串。 |
-| `ENABLE_OFFSET`| ❌ | **流量抵消开关**。填 `true` 开启，填 `false` 关闭（默认关闭）。 |
+| 变量名 (Name) | 填写说明 (Secret) | 是否必填 |
+| :--- | :--- | :--- |
+| `USERNAME` | 你的淘气兔登录邮箱帐号 (如 `test@gmail.com`) | **必填** |
+| `PASSWORD` | 你的淘气兔登录密码 | **必填** |
+| `ENABLE_OFFSET` | 是否开启流量抵消。填 `true` 开启，填 `false` (或不填) 关闭。 | 选填 |
 
-### 第四步：启用 GitHub Actions
-1.  点击仓库顶部的 **Actions** 标签。
-2.  如果你看到一个绿色的按钮 "I understand my workflows, go ahead and enable them"，请点击它。
-3.  在左侧选择 **Taoqitu Auto Checkin**。
-4.  点击右侧的 **Run workflow** 手动触发一次测试。
+### 第三步：赋予 Actions 读写权限
+为了让“日志自动清理”功能正常工作，需要确保 Actions 拥有写入权限：
+1. 在仓库的 **Settings** 中，点击左侧导航栏的 **Actions** -> **General**。
+2. 滚动到底部的 **Workflow permissions** 区域。
+3. 勾选 **Read and write permissions**，然后点击 **Save**。
 
----
-
-## ⚙️ 进阶配置：流量抵消
-
-脚本默认**只签到，不抵消流量**。如果你希望签到获得的流量自动抵消已用流量，请按以下步骤操作：
-
-1.  前往 **Settings** -> **Secrets and variables** -> **Actions**。
-2.  新建或修改 Secret：
-    * **Name**: `ENABLE_OFFSET`
-    * **Value**: `true`
-3.  下次运行时，脚本将自动查询今日签到获得的流量并执行抵消。
+### 第四步：手动触发测试
+1. 点击仓库顶部的 **Actions** 标签。
+2. 在左侧列表中选择 **Taoqitu Auto Checkin**。
+3. 点击右侧的 **Run workflow** 按钮，手动执行一次。
+4. 等待片刻，如果看到绿色的 `✓`，并且点开日志能看到 `🎉 签到反馈`，则说明配置完全成功！
 
 ---
 
-## 📝 常见问题 (FAQ)
+## ⚙️ 自定义执行时间
 
-**Q: 运行日志显示 "未登录或登陆已过期" (403 Forbidden)？**
-A: 这通常是因为 Token 失效或格式错误。
-1. 请重新在电脑浏览器抓取最新的 Token。
-2. 确保复制 Token 时没有多余的空格。
-3. 确保你的 `USER_TOKEN` Secret 名字全大写，拼写正确。
-4. 确保 Token 是从**电脑端**抓取的（脚本模拟的是 Mac 环境）。
+默认的执行时间是每天北京时间 08:30。如果你想修改执行时间，请编辑 `.github/workflows/checkin.yml` 文件中的 `cron` 表达式：
 
-**Q: 为什么我设置了 ENABLE_OFFSET 还是不抵消？**
-A: 请检查：
-1. 是否签到成功？（只有签到成功或显示“已签到”才会尝试抵消）。
-2. `ENABLE_OFFSET` 的值是否为 `true`（小写）。
-3. 当日是否有可抵消的流量记录。
-
----
-
-## ⚠️ 免责声明
-
-* 本脚本仅供学习和技术研究使用，请勿用于商业用途。
-* 使用本脚本产生的任何后果（包括但不限于账号被封禁、数据丢失等）由使用者自行承担。
-* 请支持正版，合理使用网站资源。
+```yaml
+on:
+  schedule:
+    # 这里的触发时间是 UTC 时间。
+    # 例如：UTC 的 00:30，对应北京时间 (UTC+8) 的 08:30
+    - cron: '30 0 * * *'
