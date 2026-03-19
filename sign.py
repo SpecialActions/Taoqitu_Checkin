@@ -57,18 +57,14 @@ def run_task():
         login_data = login_res.json()
         dynamic_token = None
         
-        # --- 核心修复：精准定位真正的 JWT Token ---
         if isinstance(login_data, dict) and login_data.get('data'):
             data_field = login_data['data']
             if isinstance(data_field, dict):
-                # 遍历可能的字段名，并且只认准以 'ey' 开头的标准 JWT
                 for key in ['authorization', 'auth_data', 'token', 'access_token']:
                     val = data_field.get(key)
                     if val and isinstance(val, str) and val.startswith('ey'):
                         dynamic_token = val
                         break
-                
-                # 如果没找到 ey 开头的，就硬拿优先级最高的授权字段碰碰运气
                 if not dynamic_token:
                     dynamic_token = data_field.get('authorization') or data_field.get('auth_data')
             elif isinstance(data_field, str): 
@@ -77,9 +73,8 @@ def run_task():
         if dynamic_token:
             print(f"✅ 登录成功，已精准获取真正 Token！(Token前缀: {dynamic_token[:15]}...)")
             
-            # 直接赋值，不需要补 Bearer
             headers['Authorization'] = dynamic_token
-            headers['authorization'] = dynamic_token # 补充一个小写兼容
+            headers['authorization'] = dynamic_token
             
             session.cookies.update({
                 'auth_data': dynamic_token,
@@ -108,34 +103,43 @@ def run_task():
                 print(f"⚠️ 原始签到响应: {res.text[:100]}")
 
         # ==========================================
-        # 步骤三：流量抵消逻辑
+        # 步骤三：查询剩余流量与抵消逻辑
         # ==========================================
         if res.status_code == 200 or (res.text and "已签到" in res.text):
-            if ENABLE_OFFSET.lower() != 'true':
-                print(f"🛑 抵消功能未开启 (当前设置: {ENABLE_OFFSET})，任务圆满结束。")
-                return
-
             time.sleep(2) 
-            print("🔄 抵消开关已开启，正在查询可抵消流量...")
+            print("🔄 正在获取您的签到流量数据...")
             
             list_res = session.get(f"{api_base}/user/getSignList", headers=headers, timeout=10)
             
             try:
-                list_data = list_res.json().get('data', [])
+                list_json = list_res.json()
+                
+                # --- 💡 新增：提取并计算当前剩余流量 ---
+                total_traffic = float(list_json.get('total', 0))
+                used_traffic = float(list_json.get('yishiyong_total', 0))
+                remain_traffic = total_traffic - used_traffic
+                
+                print(f"💰 【签到流量池】累计获取: {total_traffic:.2f}GB | 已抵消: {used_traffic:.2f}GB | 当前剩余: {remain_traffic:.2f}GB")
+                
+                # 检查抵消开关
+                if ENABLE_OFFSET.lower() != 'true':
+                    print(f"🛑 自动抵消未开启 (当前设置: {ENABLE_OFFSET})，任务圆满结束。")
+                    return
+
+                print("⚙️ 抵消开关已开启，准备执行抵消...")
+                list_data = list_json.get('data', [])
                 if list_data and isinstance(list_data, list):
                     first_item = list_data[0]
                     flow_val = first_item.get('get_num')
-                    is_convert = first_item.get('is_convert') 
                     
-                    print(f"📊 最新待处理流量: {flow_val}GB (抵消状态: {is_convert})")
-                    
-                    if flow_val and is_convert == 0: 
+                    # 只有当剩余流量大于 0 时，才发起抵消请求
+                    if flow_val and remain_traffic > 0: 
                         convert_res = session.get(f"{api_base}/user/convertSign", headers=headers, params={'convert_num': flow_val}, timeout=10)
                         print(f"🎁 抵消结果: {convert_res.json().get('message', '完成')}")
                     else:
-                        print("ℹ️ 最新流量已被抵消过，跳过操作。")
+                        print("ℹ️ 当前没有可抵消的剩余流量，或本次流量已抵消。")
                 else:
-                    print("ℹ️ 未查询到任何流量记录。")
+                    print("ℹ️ 未查询到任何最新的流量记录。")
             except Exception as e:
                 print(f"⚠️ 获取流量列表或抵消失败: {e}")
 
